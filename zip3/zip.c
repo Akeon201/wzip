@@ -31,11 +31,8 @@ void compress(int size, char** argv);
 // Main function
 int main(int argc, char* argv [ ]) {
 
-
-
     // Check for valid input
-    if (argc < 2)
-    {
+    if (argc < 2) {
         printf("wzip: file1 [file2 ...]\n");
         return 1;
     }
@@ -47,16 +44,14 @@ int main(int argc, char* argv [ ]) {
 }
 
 // Function to be executed by each thread
-void* compress_thread(void* arg)
-{
+void* compress_thread(void* arg) {
     ThreadData* thread_data = (ThreadData*)arg;
     compress_chunk(thread_data);
     return NULL;
 }
 
 // Compress a chunk of data using RLE
-void compress_chunk(ThreadData* thread_data)
-{
+void compress_chunk(ThreadData* thread_data) {
     char c;
     int count = 0;
 
@@ -70,21 +65,16 @@ void compress_chunk(ThreadData* thread_data)
     count = 1;
 
     // Iterate through the data and compress it
-    for (int i = 1; i < data_len; i++)
-    {
-        if (c == data [ i ])
-        {
+    for (int i = 1; i < data_len; i++) {
+        if (c == data [ i ]) {
             count++;
         }
-        else
-        {
+        else {
             // Handle the first character of the first chunk
-            if (c == *thread_data->first_char && thread_data->id == 0)
-            {
+            if (c == *thread_data->first_char && thread_data->id == 0) {
                 *thread_data->first_count += count;
             }
-            else
-            {
+            else {
                 // Write the count and character to the output
                 memcpy(output + *output_len, &count, sizeof(int));
                 *output_len += sizeof(int);
@@ -101,8 +91,7 @@ void compress_chunk(ThreadData* thread_data)
 }
 
 // Compress multiple files using RLE and multiple threads
-void compress(int size, char** argv)
-{
+void compress(int size, char** argv) {
     pthread_t threads [ MAX_THREADS ];
     ThreadData thread_data [ MAX_THREADS ];
     char prev_last_char = '\0';
@@ -111,12 +100,10 @@ void compress(int size, char** argv)
     int final_output_len = 0;
 
     // Iterate through each input file
-    for (int i = 1; i < size; i++)
-    {
+    for (int i = 1; i < size; i++) {
         // Open the file and check for errors
         int fd = open(argv [ i ], O_RDONLY);
-        if (fd == -1)
-        {
+        if (fd == -1) {
             printf("Error: Unable to open input file.\n");
             exit(1);
         }
@@ -128,8 +115,7 @@ void compress(int size, char** argv)
 
         // Memory-map the file for reading
         char* file_data = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
-        if (file_data == MAP_FAILED)
-        {
+        if (file_data == MAP_FAILED) {
             printf("Error: Unable to mmap input file.\n");
             exit(1);
         }
@@ -147,8 +133,7 @@ void compress(int size, char** argv)
         int first_count [ MAX_THREADS ], last_count [ MAX_THREADS ];
 
         // Create threads and pass data to them
-        for (int j = 0; j < num_threads; j++)
-        {
+        for (int j = 0; j < num_threads; j++) {
             thread_data [ j ].id = j;
             thread_data [ j ].data = file_data + j * chunk_size;
             thread_data [ j ].data_len = (j == num_threads - 1) ? file_data + file_size - thread_data [ j ].data : chunk_size;
@@ -158,30 +143,25 @@ void compress(int size, char** argv)
             thread_data [ j ].last_char = &last_char [ j ];
             thread_data [ j ].first_count = &first_count [ j ];
             thread_data [ j ].last_count = &last_count [ j ];
-            if (pthread_create(&threads [ j ], NULL, compress_thread, (void*)&thread_data [ j ]) != 0)
-            {
+            if (pthread_create(&threads [ j ], NULL, compress_thread, (void*)&thread_data [ j ]) != 0) {
                 printf("Error: Unable to create thread.\n");
                 exit(1);
             }
         }
 
         // Join threads and handle results
-        for (int j = 0; j < num_threads; j++)
-        {
+        for (int j = 0; j < num_threads; j++) {
             pthread_join(threads [ j ], NULL);
 
             // Handle overlapping characters between chunks
-            if (j == 0 && prev_last_char == first_char [ j ])
-            {
+            if (j == 0 && prev_last_char == first_char [ j ]) {
                 first_count [ j ] += prev_last_count;
             }
 
-            if (j > 0 && last_char [ j - 1 ] == first_char [ j ])
-            {
+            if (j > 0 && last_char [ j - 1 ] == first_char [ j ]) {
                 first_count [ j ] += last_count [ j - 1 ];
             }
-            else if (j > 0)
-            {
+            else if (j > 0) {
                 // Write the count and character from the previous chunk to the output
                 memcpy(output + output_len, &last_count [ j - 1 ], sizeof(int));
                 output_len += sizeof(int);
@@ -197,8 +177,7 @@ void compress(int size, char** argv)
         output_len += sizeof(char);
 
         // Update previous character and count for the next file
-        if (i < size - 1 && i != 0)
-        {
+        if (i < size - 1 && i != 0) {
             prev_last_char = last_char [ num_threads - 1 ];
             prev_last_count = last_count [ num_threads - 1 ];
             output_len -= sizeof(int) + sizeof(char);
@@ -218,3 +197,4 @@ void compress(int size, char** argv)
     // Write the final output to stdout and free memory
     fwrite(final_output, sizeof(char), final_output_len, stdout);
     free(final_output);
+}
